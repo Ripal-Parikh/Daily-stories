@@ -1,0 +1,138 @@
+name: Daily Story
+
+on:
+  schedule:
+    - cron: '0 20 * * *'  # 8:00 AM NZT (UTC+12)
+  workflow_dispatch:       # Allows manual trigger for testing
+
+jobs:
+  send-story:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Generate and Send Story
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          TO_EMAIL: ${{ secrets.TO_EMAIL }}
+        run: |
+          pip install anthropic --quiet
+
+          python3 << 'EOF'
+          import anthropic
+          import smtplib
+          from email.mime.text import MIMEText
+          from email.mime.multipart import MIMEMultipart
+          import os
+          import random
+          from datetime import date
+
+          # Story themes — rotates randomly each day
+          themes = [
+              "a short inspiring life story of Mahatma Gandhi suitable for a 2-year-old child",
+              "a short inspiring life story of Sardar Vallabhbhai Patel suitable for a 2-year-old child",
+              "a short inspiring life story of Steve Jobs suitable for a 2-year-old child",
+              "a short inspiring life story of APJ Abdul Kalam suitable for a 2-year-old child",
+              "a short inspiring life story of Mother Teresa suitable for a 2-year-old child",
+              "a short inspiring life story of Swami Vivekananda suitable for a 2-year-old child",
+              "a short inspiring life story of Nelson Mandela suitable for a 2-year-old child",
+              "a short inspiring life story of Dhirubhai Ambani suitable for a 2-year-old child",
+              "an inspiring story of Lord Hanuman — his strength, devotion and courage — suitable for a 2-year-old child",
+              "an inspiring story of Lord Ganesha — his wisdom and removing obstacles — suitable for a 2-year-old child",
+              "a simple life lesson story from the Ramayana — about Ram's honesty and courage — suitable for a 2-year-old child",
+              "a simple life lesson story from the Ramayana — about Sita's patience and strength — suitable for a 2-year-old child",
+              "a simple life lesson story from the Mahabharata — about Krishna's wisdom — suitable for a 2-year-old child",
+              "a simple life lesson story from the Mahabharata — about Eklavya's dedication — suitable for a 2-year-old child",
+              "an original motivational story with a simple life lesson about kindness, suitable for a 2-year-old child",
+              "an original motivational story with a simple life lesson about being brave, suitable for a 2-year-old child",
+              "an original motivational story with a simple life lesson about sharing and friendship, suitable for a 2-year-old child",
+          ]
+
+          today_theme = random.choice(themes)
+
+          prompt = f"""
+          તમે એક પ્રેમાળ દાદા છો જે તેમના 2 વર્ષના પૌત્ર/પૌત્રીને વાર્તા સંભળાવે છે.
+
+          કૃપા કરીને {today_theme} વિશે ગુજરાતી ભાષામાં એક સુંદર વાર્તા લખો.
+
+          નિયમો:
+          - વાર્તા સંપૂર્ણ ગુજરાતી ભાષામાં હોવી જોઈએ
+          - 2 વર્ષના બાળક માટે સરળ અને મીઠી ભાષા વાપરો
+          - વાર્તા 200-250 શબ્દોની હોવી જોઈએ
+          - વાર્તામાં એક સ્પષ્ટ, સરળ નૈતિક શિક્ષણ (moral) હોવું જોઈએ
+          - વાર્તાનું એક સુંદર શીર્ષક (title) આપો
+          - અંતે "આજની શીખ:" લખીને નૈતિક શિક્ષણ એક લીટીમાં લખો
+          - ઘણા બધા લાગણીવાળા શબ્દો, જેમ કે "વ્હાલા", "સુંદર", "પ્રેમ" વાપરો
+          - વાર્તા સાંભળવામાં આનંદ આવે તેવી હોવી જોઈએ
+          """
+
+          # Generate story with Claude
+          client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+          message = client.messages.create(
+              model="claude-opus-4-5",
+              max_tokens=1024,
+              messages=[
+                  {"role": "user", "content": prompt}
+              ]
+          )
+          story = message.content[0].text
+
+          # Send email
+          sender = os.environ["GMAIL_USER"]
+          receiver = os.environ["TO_EMAIL"]
+          password = os.environ["GMAIL_APP_PASSWORD"]
+
+          msg = MIMEMultipart("alternative")
+          msg["Subject"] = f"🌟 આજની વાર્તા — {date.today().strftime('%B %d, %Y')}"
+          msg["From"] = sender
+          msg["To"] = receiver
+
+          # Plain text version
+          text_part = MIMEText(story, "plain", "utf-8")
+
+          # HTML version
+          html_story = story.replace('\n', '<br>')
+          html = f"""
+          <html>
+          <body style="font-family: 'Noto Sans Gujarati', Arial, sans-serif; max-width: 600px;
+                       margin: auto; padding: 30px; background-color: #fffdf5; color: #333;">
+
+            <div style="text-align:center; padding: 10px 0;">
+              <span style="font-size: 40px;">🌟</span>
+            </div>
+
+            <h2 style="color: #d4760a; text-align:center; font-size: 22px;">
+              આજની વાર્તા
+            </h2>
+
+            <p style="color: #999; font-size: 13px; text-align:center;">
+              {date.today().strftime('%A, %B %d, %Y')}
+            </p>
+
+            <hr style="border: 1px solid #f0e0c0; margin: 20px 0;">
+
+            <div style="line-height: 2; font-size: 17px; color: #444;">
+              {html_story}
+            </div>
+
+            <hr style="border: 1px solid #f0e0c0; margin: 20px 0;">
+
+            <p style="color: #bbb; font-size: 12px; text-align:center;">
+              ❤️ તમારા નાના બાળક માટે પ્રેમથી બનાવેલ
+            </p>
+
+          </body>
+          </html>
+          """
+          html_part = MIMEText(html, "html", "utf-8")
+
+          msg.attach(text_part)
+          msg.attach(html_part)
+
+          with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+              server.login(sender, password)
+              server.sendmail(sender, receiver, msg.as_string())
+
+          print(f"✅ Story sent! Theme today: {today_theme}")
+          EOF
