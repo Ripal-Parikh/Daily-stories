@@ -3,7 +3,7 @@ name: Daily Story
 on:
   schedule:
     - cron: '0 20 * * *'  # 8:00 AM NZT (UTC+12)
-  workflow_dispatch:       # Allows manual trigger for testing
+  workflow_dispatch:
 
 jobs:
   send-story:
@@ -12,15 +12,15 @@ jobs:
     steps:
       - name: Generate and Send Story
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           TO_EMAIL: ${{ secrets.TO_EMAIL }}
         run: |
-          pip install anthropic --quiet
+          pip install google-generativeai --quiet
 
           python3 << 'EOF'
-          import anthropic
+          import google.generativeai as genai
           import smtplib
           from email.mime.text import MIMEText
           from email.mime.multipart import MIMEMultipart
@@ -28,7 +28,7 @@ jobs:
           import random
           from datetime import date
 
-          # Story themes — rotates randomly each day
+          # Story themes
           themes = [
               "a short inspiring life story of Mahatma Gandhi suitable for a 2-year-old child",
               "a short inspiring life story of Sardar Vallabhbhai Patel suitable for a 2-year-old child",
@@ -40,10 +40,10 @@ jobs:
               "a short inspiring life story of Dhirubhai Ambani suitable for a 2-year-old child",
               "an inspiring story of Lord Hanuman — his strength, devotion and courage — suitable for a 2-year-old child",
               "an inspiring story of Lord Ganesha — his wisdom and removing obstacles — suitable for a 2-year-old child",
-              "a simple life lesson story from the Ramayana — about Ram's honesty and courage — suitable for a 2-year-old child",
-              "a simple life lesson story from the Ramayana — about Sita's patience and strength — suitable for a 2-year-old child",
-              "a simple life lesson story from the Mahabharata — about Krishna's wisdom — suitable for a 2-year-old child",
-              "a simple life lesson story from the Mahabharata — about Eklavya's dedication — suitable for a 2-year-old child",
+              "a simple life lesson story from the Ramayana about Ram's honesty and courage, suitable for a 2-year-old child",
+              "a simple life lesson story from the Ramayana about Sita's patience and strength, suitable for a 2-year-old child",
+              "a simple life lesson story from the Mahabharata about Krishna's wisdom, suitable for a 2-year-old child",
+              "a simple life lesson story from the Mahabharata about Eklavya's dedication, suitable for a 2-year-old child",
               "an original motivational story with a simple life lesson about kindness, suitable for a 2-year-old child",
               "an original motivational story with a simple life lesson about being brave, suitable for a 2-year-old child",
               "an original motivational story with a simple life lesson about sharing and friendship, suitable for a 2-year-old child",
@@ -67,16 +67,11 @@ jobs:
           - વાર્તા સાંભળવામાં આનંદ આવે તેવી હોવી જોઈએ
           """
 
-          # Generate story with Claude
-          client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-          message = client.messages.create(
-              model="claude-opus-4-5",
-              max_tokens=1024,
-              messages=[
-                  {"role": "user", "content": prompt}
-              ]
-          )
-          story = message.content[0].text
+          # Generate story with Gemini
+          genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+          model = genai.GenerativeModel("gemini-1.5-flash")  # Free tier model
+          response = model.generate_content(prompt)
+          story = response.text
 
           # Send email
           sender = os.environ["GMAIL_USER"]
