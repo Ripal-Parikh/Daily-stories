@@ -2,14 +2,20 @@ name: Daily Story
 
 on:
   schedule:
-    - cron: '0 20 * * *'  # 8:00 AM NZT (UTC+12)
+    - cron: '0 20 * * *'
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   send-story:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
       - name: Generate and Send Story
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -25,55 +31,83 @@ jobs:
           from email.mime.multipart import MIMEMultipart
           import os
           import random
+          import json
           from datetime import date
+          from google import genai
 
-          # Story themes
+          # Story themes with categories
           themes = [
-              "a short inspiring life story of Mahatma Gandhi suitable for a 2-year-old child",
-              "a short inspiring life story of Sardar Vallabhbhai Patel suitable for a 2-year-old child",
-              "a short inspiring life story of Steve Jobs suitable for a 2-year-old child",
-              "a short inspiring life story of APJ Abdul Kalam suitable for a 2-year-old child",
-              "a short inspiring life story of Mother Teresa suitable for a 2-year-old child",
-              "a short inspiring life story of Swami Vivekananda suitable for a 2-year-old child",
-              "a short inspiring life story of Nelson Mandela suitable for a 2-year-old child",
-              "a short inspiring life story of Dhirubhai Ambani suitable for a 2-year-old child",
-              "an inspiring story of Lord Hanuman — his strength, devotion and courage — suitable for a 2-year-old child",
-              "an inspiring story of Lord Ganesha — his wisdom and removing obstacles — suitable for a 2-year-old child",
-              "a simple life lesson story from the Ramayana about Ram's honesty and courage, suitable for a 2-year-old child",
-              "a simple life lesson story from the Ramayana about Sita's patience and strength, suitable for a 2-year-old child",
-              "a simple life lesson story from the Mahabharata about Krishna's wisdom, suitable for a 2-year-old child",
-              "a simple life lesson story from the Mahabharata about Eklavya's dedication, suitable for a 2-year-old child",
-              "an original motivational story with a simple life lesson about kindness, suitable for a 2-year-old child",
-              "an original motivational story with a simple life lesson about being brave, suitable for a 2-year-old child",
-              "an original motivational story with a simple life lesson about sharing and friendship, suitable for a 2-year-old child",
+              {"topic": "Gandhi", "category": "Leaders", "prompt": "a short inspiring life story of Mahatma Gandhi for a 2-year-old child"},
+              {"topic": "Sardar Patel", "category": "Leaders", "prompt": "a short inspiring life story of Sardar Vallabhbhai Patel for a 2-year-old child"},
+              {"topic": "Steve Jobs", "category": "Leaders", "prompt": "a short inspiring life story of Steve Jobs for a 2-year-old child"},
+              {"topic": "APJ Abdul Kalam", "category": "Leaders", "prompt": "a short inspiring life story of APJ Abdul Kalam for a 2-year-old child"},
+              {"topic": "Mother Teresa", "category": "Leaders", "prompt": "a short inspiring life story of Mother Teresa for a 2-year-old child"},
+              {"topic": "Swami Vivekananda", "category": "Leaders", "prompt": "a short inspiring life story of Swami Vivekananda for a 2-year-old child"},
+              {"topic": "Nelson Mandela", "category": "Leaders", "prompt": "a short inspiring life story of Nelson Mandela for a 2-year-old child"},
+              {"topic": "Dhirubhai Ambani", "category": "Leaders", "prompt": "a short inspiring life story of Dhirubhai Ambani for a 2-year-old child"},
+              {"topic": "Hanuman", "category": "Mythology", "prompt": "an inspiring story of Lord Hanuman — his strength, devotion and courage — for a 2-year-old child"},
+              {"topic": "Ganesha", "category": "Mythology", "prompt": "an inspiring story of Lord Ganesha — his wisdom and removing obstacles — for a 2-year-old child"},
+              {"topic": "Ram", "category": "Ramayana", "prompt": "a simple life lesson story from the Ramayana about Ram's honesty and courage for a 2-year-old child"},
+              {"topic": "Sita", "category": "Ramayana", "prompt": "a simple life lesson story from the Ramayana about Sita's patience and strength for a 2-year-old child"},
+              {"topic": "Hanuman & Ram", "category": "Ramayana", "prompt": "a simple story from the Ramayana about Hanuman's devotion to Ram for a 2-year-old child"},
+              {"topic": "Krishna", "category": "Mahabharata", "prompt": "a simple life lesson story from the Mahabharata about Krishna's wisdom for a 2-year-old child"},
+              {"topic": "Eklavya", "category": "Mahabharata", "prompt": "a simple life lesson story from the Mahabharata about Eklavya's dedication for a 2-year-old child"},
+              {"topic": "Kindness", "category": "Life Lessons", "prompt": "an original motivational story with a simple life lesson about kindness for a 2-year-old child"},
+              {"topic": "Bravery", "category": "Life Lessons", "prompt": "an original motivational story with a simple life lesson about being brave for a 2-year-old child"},
+              {"topic": "Friendship", "category": "Life Lessons", "prompt": "an original motivational story with a simple life lesson about sharing and friendship for a 2-year-old child"},
           ]
 
-          today_theme = random.choice(themes)
+          today = random.choice(themes)
 
           prompt = f"""
-          તમે એક પ્રેમાળ દાદા છો જે તેમના 2 વર્ષના પૌત્ર/પૌત્રીને વાર્તા સંભળાવે છે.
+          You are a loving grandfather telling a bedtime story to a 2-year-old child.
 
-          કૃપા કરીને {today_theme} વિશે ગુજરાતી ભાષામાં એક સુંદર વાર્તા લખો.
+          Write a beautiful short story in English about {today['prompt']}.
 
-          નિયમો:
-          - વાર્તા સંપૂર્ણ ગુજરાતી ભાષામાં હોવી જોઈએ
-          - 2 વર્ષના બાળક માટે સરળ અને મીઠી ભાષા વાપરો
-          - વાર્તા 200-250 શબ્દોની હોવી જોઈએ
-          - વાર્તામાં એક સ્પષ્ટ, સરળ નૈતિક શિક્ષણ (moral) હોવું જોઈએ
-          - વાર્તાનું એક સુંદર શીર્ષક (title) આપો
-          - અંતે "આજની શીખ:" લખીને નૈતિક શિક્ષણ એક લીટીમાં લખો
-          - ઘણા બધા લાગણીવાળા શબ્દો, જેમ કે "વ્હાલા", "સુંદર", "પ્રેમ" વાપરો
-          - વાર્તા સાંભળવામાં આનંદ આવે તેવી હોવી જોઈએ
+          Rules:
+          - Write completely in English
+          - Use very simple, warm, loving language suitable for a 2-year-old
+          - Story should be 200-250 words
+          - Give the story a beautiful title on the first line
+          - End with "Today's Lesson:" followed by one simple moral in one line
+          - Use warm words like "little", "sweet", "loved", "brave", "kind"
+          - The story should be joyful and fun to read aloud
           """
 
-          # Generate story with Gemini
-          from google import genai
+          # Generate story
           client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
           response = client.models.generate_content(
-              model="gemini-2.5-flash",
+              model="gemini-1.5-flash-latest",
               contents=prompt
           )
           story = response.text
+
+          # Extract title (first line)
+          lines = story.strip().split('\n')
+          title = lines[0].replace('#', '').strip()
+
+          # Save to stories.json
+          stories_file = "docs/stories.json"
+          os.makedirs("docs", exist_ok=True)
+
+          if os.path.exists(stories_file):
+              with open(stories_file, "r") as f:
+                  stories = json.load(f)
+          else:
+              stories = []
+
+          stories.insert(0, {
+              "date": str(date.today()),
+              "title": title,
+              "topic": today["topic"],
+              "category": today["category"],
+              "story": story
+          })
+
+          with open(stories_file, "w") as f:
+              json.dump(stories, f, ensure_ascii=False, indent=2)
+
+          print(f"✅ Story saved to {stories_file}")
 
           # Send email
           sender = os.environ["GMAIL_USER"]
@@ -81,49 +115,30 @@ jobs:
           password = os.environ["GMAIL_APP_PASSWORD"]
 
           msg = MIMEMultipart("alternative")
-          msg["Subject"] = f"🌟 આજની વાર્તા — {date.today().strftime('%B %d, %Y')}"
+          msg["Subject"] = f"🌟 Today's Story — {title}"
           msg["From"] = sender
           msg["To"] = receiver
 
-          # Plain text version
           text_part = MIMEText(story, "plain", "utf-8")
 
-          # HTML version
           html_story = story.replace('\n', '<br>')
           html = f"""
           <html>
-          <body style="font-family: 'Noto Sans Gujarati', Arial, sans-serif; max-width: 600px;
+          <body style="font-family: Georgia, serif; max-width: 600px;
                        margin: auto; padding: 30px; background-color: #fffdf5; color: #333;">
-
-            <div style="text-align:center; padding: 10px 0;">
-              <span style="font-size: 40px;">🌟</span>
-            </div>
-
-            <h2 style="color: #d4760a; text-align:center; font-size: 22px;">
-              આજની વાર્તા
-            </h2>
-
+            <div style="text-align:center;"><span style="font-size: 40px;">🌟</span></div>
+            <h2 style="color: #d4760a; text-align:center;">{title}</h2>
             <p style="color: #999; font-size: 13px; text-align:center;">
-              {date.today().strftime('%A, %B %d, %Y')}
+              {date.today().strftime('%A, %B %d, %Y')} | {today['category']} — {today['topic']}
             </p>
-
-            <hr style="border: 1px solid #f0e0c0; margin: 20px 0;">
-
-            <div style="line-height: 2; font-size: 17px; color: #444;">
-              {html_story}
-            </div>
-
-            <hr style="border: 1px solid #f0e0c0; margin: 20px 0;">
-
-            <p style="color: #bbb; font-size: 12px; text-align:center;">
-              ❤️ તમારા નાના બાળક માટે પ્રેમથી બનાવેલ
-            </p>
-
+            <hr style="border: 1px solid #f0e0c0;">
+            <div style="line-height: 2; font-size: 17px;">{html_story}</div>
+            <hr style="border: 1px solid #f0e0c0;">
+            <p style="color: #bbb; font-size: 12px; text-align:center;">❤️ Made with love for your little one</p>
           </body>
           </html>
           """
           html_part = MIMEText(html, "html", "utf-8")
-
           msg.attach(text_part)
           msg.attach(html_part)
 
@@ -131,5 +146,13 @@ jobs:
               server.login(sender, password)
               server.sendmail(sender, receiver, msg.as_string())
 
-          print(f"✅ Story sent! Theme today: {today_theme}")
+          print("✅ Email sent!")
           EOF
+
+      - name: Commit stories.json
+        run: |
+          git config user.name "Story Bot"
+          git config user.email "storybot@github.com"
+          git add docs/stories.json
+          git diff --staged --quiet || git commit -m "Add story for $(date '+%Y-%m-%d')"
+          git push
