@@ -17,10 +17,9 @@ jobs:
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           TO_EMAIL: ${{ secrets.TO_EMAIL }}
         run: |
-          pip install google-generativeai --quiet
+          pip install google-genai --quiet
 
           python3 << 'EOF'
-          import google.generativeai as genai
           import smtplib
           from email.mime.text import MIMEText
           from email.mime.multipart import MIMEMultipart
@@ -68,9 +67,12 @@ jobs:
           """
 
           # Generate story with Gemini
-          genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-          model = genai.GenerativeModel("gemini-1.5-flash")  # Free tier model
-          response = model.generate_content(prompt)
+          from google import genai
+          client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+          response = client.models.generate_content(
+              model="gemini-2.0-flash",
+              contents=prompt
+          )
           story = response.text
 
           # Send email
